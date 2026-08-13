@@ -27,7 +27,7 @@ async def list_libraries(
     user_id, user_role = user_role_pair
     stmt = (
         select(Library)
-        .options(selectinload(Library.owner), selectinload(Library.storage_provider))
+        .options(selectinload(Library.owner))
         .order_by(Library.created_at.desc())
     )
     result = await db.execute(stmt)
@@ -52,7 +52,6 @@ async def create_library(
     new_library = Library(
         name=payload.name,
         description=payload.description,
-        storage_provider_id=payload.storage_provider_id,
         is_private=payload.is_private,
         owner_id=uuid.UUID(user_id),
     )
@@ -75,7 +74,7 @@ async def create_library(
     stmt = (
         select(Library)
         .where(Library.id == new_library.id)
-        .options(selectinload(Library.owner), selectinload(Library.storage_provider))
+        .options(selectinload(Library.owner))
     )
     result = await db.execute(stmt)
     return result.scalar_one()
@@ -200,7 +199,7 @@ async def get_library(
     stmt = (
         select(Library)
         .where(Library.id == library_id)
-        .options(selectinload(Library.owner), selectinload(Library.storage_provider))
+        .options(selectinload(Library.owner))
     )
     result = await db.execute(stmt)
     library = result.scalar_one_or_none()
@@ -225,7 +224,7 @@ async def update_library(
     stmt = (
         select(Library)
         .where(Library.id == library_id)
-        .options(selectinload(Library.owner), selectinload(Library.storage_provider))
+        .options(selectinload(Library.owner))
     )
     result = await db.execute(stmt)
     library = result.scalar_one_or_none()

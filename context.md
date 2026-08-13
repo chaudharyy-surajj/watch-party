@@ -231,19 +231,11 @@ Do not tightly couple the system to Backblaze.
 
 # Library Structure
 
-User
-
-↓
-
 Library
-
-↓
-
-Collections
-
-↓
-
-Movies / Series
+  |
+  +-- Collections (Virtual groupings)
+        |
+        +-- Movies / Series  <---> StorageProvider (Physical B2 Buckets)
 
 Permissions are primarily assigned at the Collection level.
 

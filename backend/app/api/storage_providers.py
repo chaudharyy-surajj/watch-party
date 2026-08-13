@@ -23,7 +23,7 @@ from sqlalchemy import select
 from app.core.dependencies import DatabaseDep, RequireLevel2Dep
 from app.core.security import decrypt_secret, encrypt_secret
 from app.models.enums import StorageProviderType
-from app.models.library import Library
+from app.models.movie import Movie
 from app.models.storage_provider import StorageProvider
 
 logger = structlog.get_logger()
@@ -174,13 +174,13 @@ async def delete_storage_provider(
     if str(provider.owner_id) != user_id:
         raise HTTPException(status_code=403, detail="Not your storage provider")
 
-    # Check if there are linked libraries before attempting deletion
-    stmt = select(Library.id).where(Library.storage_provider_id == provider_id)
+    # Check if there are linked movies before attempting deletion
+    stmt = select(Movie.id).where(Movie.storage_provider_id == provider_id)
     result = await db.execute(stmt)
     if result.first():
         raise HTTPException(
             status_code=400,
-            detail="Cannot delete storage provider because it is used by one or more libraries. Delete the libraries first.",
+            detail="Cannot delete storage provider because it is used by one or more movies. Delete the movies first.",
         )
 
     await db.delete(provider)

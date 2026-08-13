@@ -26,6 +26,7 @@ from app.models.enums import StorageProviderType
 
 if TYPE_CHECKING:
     from app.models.library import Library
+    from app.models.movie import Movie
     from app.models.user import User
 
 
@@ -103,6 +104,11 @@ class StorageProvider(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     )
     libraries: Mapped[list[Library]] = relationship(
         "Library",
+        lazy="select",
+        passive_deletes=True,
+    )
+    movies: Mapped[list[Movie]] = relationship(
+        "Movie",
         back_populates="storage_provider",
         lazy="select",
     )

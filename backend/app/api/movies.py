@@ -129,6 +129,7 @@ async def create_movie(
 
     new_movie = Movie(
         collection_id=payload.collection_id,
+        storage_provider_id=payload.storage_provider_id,
         title=payload.title,
         slug=slug,
         description=payload.description,
@@ -144,6 +145,7 @@ async def create_movie(
         select(Movie)
         .where(Movie.id == new_movie.id)
         .options(
+            selectinload(Movie.storage_provider),
             selectinload(Movie.collection)
             .selectinload(Collection.library)
             .selectinload(Library.owner)
@@ -165,6 +167,7 @@ async def get_movie(
         select(Movie)
         .where(Movie.id == movie_id)
         .options(
+            selectinload(Movie.storage_provider),
             selectinload(Movie.collection)
             .selectinload(Collection.library)
             .selectinload(Library.owner)
@@ -329,9 +332,8 @@ async def get_hls_key_token(
         select(Movie)
         .where(Movie.id == movie_id)
         .options(
-            selectinload(Movie.collection)
-            .selectinload(Collection.library)
-            .selectinload(Library.storage_provider)
+            selectinload(Movie.storage_provider),
+            selectinload(Movie.collection).selectinload(Collection.library)
         )
     )
     result = await db.execute(stmt)
@@ -381,7 +383,7 @@ async def get_hls_key_token(
 
     # In a production scenario, the StorageProvider should have a cdn_url configured
     # to proxy the B2 bucket via Cloudflare.
-    sp = movie.collection.library.storage_provider
+    sp = movie.storage_provider
     if sp.cdn_url:
         base_url = sp.cdn_url.rstrip("/")
         hls_url = f"{base_url}/{movie.hls_master_path}"
@@ -431,9 +433,8 @@ async def stream_movie_file(
         select(Movie)
         .where(Movie.id == movie_id)
         .options(
-            selectinload(Movie.collection)
-            .selectinload(Collection.library)
-            .selectinload(Library.storage_provider)
+            selectinload(Movie.storage_provider),
+            selectinload(Movie.collection).selectinload(Collection.library)
         )
     )
     result = await db.execute(stmt)
@@ -441,7 +442,7 @@ async def stream_movie_file(
     if not movie:
         raise HTTPException(status_code=404, detail="Movie not found")
 
-    sp = movie.collection.library.storage_provider
+    sp = movie.storage_provider
     creds = json.loads(decrypt_secret(sp.credentials_encrypted))
 
     s3 = boto3.client(
