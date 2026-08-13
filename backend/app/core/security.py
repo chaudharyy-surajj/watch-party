@@ -51,78 +51,93 @@ _jwks_cache: dict[str, list[dict]] = {}
 
 
 async def _fetch_jwks() -> list[dict]:
-    """Fetch Supabase's JSON Web Key Set (supports RS256 and HS256 projects)."""
+    """Fetch Supabase's JWKS, with in-memory caching. Returns [] on any error."""
+    if not settings.supabase_url:
+        return []
+
     if settings.supabase_url in _jwks_cache:
         return _jwks_cache[settings.supabase_url]
 
-    import httpx
-    jwks_url = f"{settings.supabase_url}/auth/v1/.well-known/jwks.json"
-    async with httpx.AsyncClient(timeout=10) as client:
-        resp = await client.get(jwks_url)
-        resp.raise_for_status()
-        keys = resp.json().get("keys", [])
+    try:
+        import httpx
+        jwks_url = f"{settings.supabase_url}/auth/v1/.well-known/jwks.json"
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(jwks_url)
+            resp.raise_for_status()
+            keys = resp.json().get("keys", [])
+        _jwks_cache[settings.supabase_url] = keys
+        return keys
+    except Exception as exc:
+        import structlog
+        structlog.get_logger().warning("jwks_fetch_failed", error=str(exc))
+        return []
 
-    _jwks_cache[settings.supabase_url] = keys
-    return keys
+
+def _peek_alg(token: str) -> str:
+    """Extract the 'alg' field from a JWT header without validating."""
+    import base64
+    import json as _json
+    try:
+        seg = token.split(".")[0]
+        padded = seg + "=" * (4 - len(seg) % 4)
+        return _json.loads(base64.urlsafe_b64decode(padded)).get("alg", "HS256")
+    except Exception:
+        return "HS256"
 
 
 def decode_supabase_token(token: str) -> dict[str, Any]:
-    """Validate a Supabase HS256 token using the JWT secret.
-
-    For RS256 tokens, use decode_supabase_token_async instead.
-    Peeks at the alg header and dispatches accordingly (sync RS256 not supported).
-
-    Raises:
-        jose.JWTError: If the token is invalid, expired, or has a bad signature.
-    """
-    import base64
-    import json as _json
-
-    header_segment = token.split(".")[0]
-    padding = 4 - len(header_segment) % 4
-    header_bytes = base64.urlsafe_b64decode(header_segment + "=" * (padding % 4))
-    alg = _json.loads(header_bytes).get("alg", "HS256")
-
-    if alg == "HS256":
+    """Validate a Supabase HS256 token using the JWT secret (sync, legacy)."""
+    try:
+        alg = _peek_alg(token)
+        if alg != "HS256":
+            raise JWTError(f"Algorithm {alg} requires async validation")
         return jwt.decode(token, settings.supabase_jwt_secret, algorithms=["HS256"])
-
-    # RS256 — caller must use decode_supabase_token_async
-    raise JWTError(f"Algorithm {alg} requires async validation — use decode_supabase_token_async")
+    except JWTError:
+        raise
+    except Exception as exc:
+        raise JWTError(str(exc)) from exc
 
 
 async def decode_supabase_token_async(token: str) -> dict[str, Any]:
-    """Validate a Supabase JWT — works for both HS256 and RS256 projects.
+    """Validate a Supabase JWT — supports both HS256 and RS256.
 
     - HS256: validated with SUPABASE_JWT_SECRET (symmetric).
-    - RS256: validated with the public key from Supabase's JWKS endpoint.
+    - RS256: validated using public keys from Supabase's JWKS endpoint.
 
-    Raises:
-        jose.JWTError: If the token is invalid, expired, or has a bad signature.
+    All exceptions are normalised to JWTError so callers always get a 401.
     """
-    import base64
-    import json as _json
+    try:
+        alg = _peek_alg(token)
 
-    header_segment = token.split(".")[0]
-    padding = 4 - len(header_segment) % 4
-    header_bytes = base64.urlsafe_b64decode(header_segment + "=" * (padding % 4))
-    alg = _json.loads(header_bytes).get("alg", "HS256")
+        if alg == "HS256":
+            return jwt.decode(token, settings.supabase_jwt_secret, algorithms=["HS256"])
 
-    if alg == "HS256":
-        return jwt.decode(token, settings.supabase_jwt_secret, algorithms=["HS256"])
+        # RS256 / asymmetric — use JWKS public keys
+        keys = await _fetch_jwks()
+        if not keys:
+            raise JWTError(
+                "Could not fetch Supabase JWKS. "
+                "Ensure SUPABASE_URL is set and the Supabase project is reachable."
+            )
 
-    # RS256 or other asymmetric alg — fetch JWKS and validate
-    keys = await _fetch_jwks()
-    if not keys:
-        raise JWTError("Could not fetch JWKS from Supabase to validate token")
+        last_exc: Exception = JWTError("No matching JWKS key found for this token")
+        for jwk_key in keys:
+            try:
+                # python-jose accepts JWK dicts directly for RSA keys
+                return jwt.decode(token, jwk_key, algorithms=[alg])
+            except JWTError as exc:
+                last_exc = exc
+            except Exception as exc:
+                last_exc = JWTError(str(exc))
 
-    last_exc: Exception = JWTError("No matching key found in JWKS")
-    for key in keys:
-        try:
-            return jwt.decode(token, key, algorithms=[alg])
-        except JWTError as exc:
-            last_exc = exc
+        raise last_exc
 
-    raise last_exc
+    except JWTError:
+        raise
+    except Exception as exc:
+        # Catch-all: never let a non-JWTError escape and cause a 500
+        raise JWTError(f"Token validation error: {exc}") from exc
+
 
 
 # ── Action token helpers (kept for ws, hls, stream, invite) ────────────────────
