@@ -128,7 +128,9 @@ def fetch_orphaned_movies(api_url: str, headers: dict) -> list[dict]:
 # B2
 
 def fetch_storage_credentials(api_url: str, headers: dict) -> dict | None:
-    resp = httpx.get(f"{api_url}/api/storage-providers", headers=headers, timeout=30.0)
+    with console.status("[cyan]Fetching storage providers...", spinner="dots"):
+        resp = httpx.get(f"{api_url}/api/storage-providers", headers=headers, timeout=30.0)
+    
     if resp.status_code != 200 or not resp.json():
         return None
     
@@ -145,11 +147,12 @@ def fetch_storage_credentials(api_url: str, headers: dict) -> dict | None:
             return None
         provider_id = providers[int(choice_str) - 1]["id"]
 
-    cred_resp = httpx.get(
-        f"{api_url}/api/storage-providers/{provider_id}/credentials",
-        headers=headers,
-        timeout=30.0,
-    )
+    with console.status("[cyan]Fetching B2 credentials...", spinner="dots"):
+        cred_resp = httpx.get(
+            f"{api_url}/api/storage-providers/{provider_id}/credentials",
+            headers=headers,
+            timeout=30.0,
+        )
     if cred_resp.status_code != 200:
         return None
         
@@ -297,8 +300,7 @@ def main() -> None:
         clean_b2 = Confirm.ask("\nAlso delete associated files from Backblaze B2?")
 
     if clean_b2:
-        with console.status("[cyan]Fetching B2 credentials...", spinner="dots"):
-            b2_creds = fetch_storage_credentials(api_url, headers)
+        b2_creds = fetch_storage_credentials(api_url, headers)
             
         if not b2_creds:
             console.print("[yellow]Could not fetch B2 credentials. Skipping B2 deletion.[/]")
