@@ -25,13 +25,12 @@ export default function LoginForm() {
     setError(null);
 
     try {
-      const { error: authError } = await supabase.auth.signInWithPassword({
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       });
 
       if (authError) {
-        // Map common Supabase error messages to user-friendly ones
         if (authError.message.includes("Email not confirmed")) {
           router.push(`/verify-email?email=${encodeURIComponent(email.trim())}`);
           return;
@@ -40,8 +39,12 @@ export default function LoginForm() {
         return;
       }
 
-      // Fetch app-specific profile from the backend
-      const { data: userProfile } = await api.get<User>("/api/auth/me");
+      // Use the token from the sign-in response directly — avoids a race condition
+      // where getSession() in the interceptor hasn't persisted the session yet.
+      const token = authData.session?.access_token;
+      const { data: userProfile } = await api.get<User>("/api/auth/me", {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
       useAuthStore.getState().setUser(userProfile);
 
       router.push("/library");
