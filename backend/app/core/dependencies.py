@@ -24,7 +24,7 @@ from jose import JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
-from app.core.security import decode_token
+from app.core.security import decode_supabase_token
 from app.db.session import get_db
 
 logger = structlog.get_logger()
@@ -43,7 +43,7 @@ async def get_current_user_id(
     ] = None,
     access_token: Annotated[str | None, Cookie()] = None,
 ) -> str:
-    """Extract and validate the current user's ID from a JWT.
+    """Extract and validate the current user's ID from a Supabase JWT.
 
     Accepts tokens from two sources (in order of preference):
     1. ``Authorization: Bearer <token>`` header
@@ -53,7 +53,7 @@ async def get_current_user_id(
         HTTPException 401: If no token is present or it is invalid/expired.
 
     Returns:
-        The ``sub`` claim from the token (user UUID as string).
+        The ``sub`` claim from the Supabase token (user UUID as string).
     """
     token: str | None = None
 
@@ -70,7 +70,7 @@ async def get_current_user_id(
         )
 
     try:
-        payload = decode_token(token)
+        payload = decode_supabase_token(token)
     except JWTError as exc:
         logger.debug("token_validation_failed", error=str(exc))
         raise HTTPException(
@@ -78,12 +78,6 @@ async def get_current_user_id(
             detail="Invalid or expired token",
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
-
-    if payload.get("type") != "access":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token type",
-        )
 
     user_id: str | None = payload.get("sub")
     if not user_id:
@@ -102,10 +96,11 @@ async def get_current_user_role(
     ] = None,
     access_token: Annotated[str | None, Cookie()] = None,
 ) -> tuple[str, str]:
-    """Return ``(user_id, role)`` from the access token.
+    """Return ``(user_id, role)`` from the Supabase access token.
 
-    Embedding the role in the JWT avoids a DB lookup on every request.
-    Role changes take effect at next login (or token refresh).
+    Role is read from ``app_metadata.role`` inside the Supabase JWT.
+    This requires a Supabase database trigger or hook that sets
+    app_metadata.role when a user is created or their role changes.
 
     Returns:
         Tuple of (user_id: str, role: str).
@@ -124,7 +119,7 @@ async def get_current_user_role(
         )
 
     try:
-        payload = decode_token(token)
+        payload = decode_supabase_token(token)
     except JWTError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -132,14 +127,13 @@ async def get_current_user_role(
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
 
-    if payload.get("type") != "access":
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
-
     user_id: str | None = payload.get("sub")
-    role: str = payload.get("role", "level1")
-
     if not user_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+    # Supabase stores custom claims in app_metadata
+    app_metadata: dict = payload.get("app_metadata") or {}
+    role: str = app_metadata.get("role", "level1")
 
     return user_id, role
 

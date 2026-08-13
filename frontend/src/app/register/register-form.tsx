@@ -3,20 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Loader2, Check } from "lucide-react";
-import api, { getErrorMessage } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 
-interface RegisterResponse {
-  message: string;
-  email: string;
-  requires_verification: boolean;
-}
-
-interface Props {
-  inviteToken: string | null;
-}
-
-export default function RegisterForm({ inviteToken }: Props) {
+export default function RegisterForm() {
   const router = useRouter();
   const [form, setForm] = useState({
     username: "",
@@ -47,23 +37,28 @@ export default function RegisterForm({ inviteToken }: Props) {
     setError(null);
 
     try {
-      const { data } = await api.post<RegisterResponse>("/api/auth/register", {
-        ...(inviteToken ? { invite_token: inviteToken } : {}),
-        username: form.username.trim(),
+      const { error: signUpError } = await supabase.auth.signUp({
         email: form.email.trim(),
         password: form.password,
+        options: {
+          // Pass username as metadata — the DB trigger will copy this to
+          // the public.users table on account creation.
+          data: {
+            username: form.username.trim().toLowerCase(),
+          },
+        },
       });
 
-      // Account created — redirect to email verification
-      if (data.requires_verification) {
-        router.push(`/verify-email?email=${encodeURIComponent(data.email)}`);
+      if (signUpError) {
+        setError(signUpError.message);
         return;
       }
 
-      // Fallback (should not happen with email verification enabled)
-      router.push("/library");
-    } catch (err) {
-      setError(getErrorMessage(err));
+      // Supabase sends the OTP email automatically.
+      // Redirect to our verify-email page to collect the code.
+      router.push(`/verify-email?email=${encodeURIComponent(form.email.trim())}`);
+    } catch {
+      setError("An unexpected error occurred. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -71,7 +66,6 @@ export default function RegisterForm({ inviteToken }: Props) {
 
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-4">
-
       <div className="space-y-1.5">
         <label htmlFor="reg-username" className="text-sm font-medium text-content-secondary">
           Username

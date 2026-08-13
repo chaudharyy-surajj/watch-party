@@ -2,8 +2,8 @@
 Security utilities: JWT, bcrypt, AES-256-GCM encryption, HLS key signing.
 
 Design decisions:
-- Access tokens are short-lived (30 min default).
-- Refresh tokens are long-lived (7 days default), stored as httpOnly cookies.
+- Session JWTs are now issued by Supabase Auth and validated using SUPABASE_JWT_SECRET.
+- Action tokens (ws, hls_key, stream, invite) are still signed locally with SECRET_KEY.
 - Storage provider credentials are encrypted with AES-256-GCM before DB storage.
   The nonce is prepended to the ciphertext and the whole thing is base64url-encoded.
 - HLS encryption keys are signed with a separate secret so they can be validated
@@ -47,55 +47,24 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         return False
 
 
-# ── JWT ───────────────────────────────────────────────────────────────────────
+# ── Supabase Session JWT ──────────────────────────────────────────────────────
 
 
-def create_access_token(
-    subject: str,
-    role: str | None = None,
-    additional_claims: dict[str, Any] | None = None,
-) -> str:
-    """Create a short-lived JWT access token.
+def decode_supabase_token(token: str) -> dict[str, Any]:
+    """Validate and decode a Supabase-issued session JWT.
 
-    Args:
-        subject: User ID (UUID string).
-        role: User role string, embedded in the token to avoid DB lookups
-              on every request.
-        additional_claims: Any extra key-value pairs to embed.
-
-    Returns:
-        Signed JWT string.
+    Uses SUPABASE_JWT_SECRET from settings.
+    Raises:
+        jose.JWTError: If the token is invalid, expired, or has a bad signature.
     """
-    expire = datetime.now(UTC) + timedelta(minutes=settings.access_token_expire_minutes)
-    payload: dict[str, Any] = {
-        "sub": subject,
-        "exp": expire,
-        "type": "access",
-    }
-    if role is not None:
-        payload["role"] = role
-    if additional_claims:
-        payload.update(additional_claims)
-
-    return jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
+    return jwt.decode(token, settings.supabase_jwt_secret, algorithms=[settings.algorithm])
 
 
-def create_refresh_token(subject: str) -> str:
-    """Create a long-lived JWT refresh token.
-
-    Stored as an httpOnly cookie; should NOT contain sensitive claims.
-    """
-    expire = datetime.now(UTC) + timedelta(days=settings.refresh_token_expire_days)
-    payload: dict[str, Any] = {
-        "sub": subject,
-        "exp": expire,
-        "type": "refresh",
-    }
-    return jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
+# ── Action token helpers (kept for ws, hls, stream, invite) ────────────────────
 
 
 def decode_token(token: str) -> dict[str, Any]:
-    """Decode and validate a JWT token.
+    """Decode and validate an action JWT (ws/hls/stream/invite) signed by SECRET_KEY.
 
     Raises:
         jose.JWTError: If the token is invalid, expired, or has a bad signature.
