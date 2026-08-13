@@ -95,12 +95,12 @@ async def get_current_user_role(
         Depends(_bearer_scheme),
     ] = None,
     access_token: Annotated[str | None, Cookie()] = None,
+    db: DatabaseDep = Depends(get_db),
 ) -> tuple[str, str]:
-    """Return ``(user_id, role)`` from the Supabase access token.
+    """Return ``(user_id, role)`` from the database.
 
-    Role is read from ``app_metadata.role`` inside the Supabase JWT.
-    This requires a Supabase database trigger or hook that sets
-    app_metadata.role when a user is created or their role changes.
+    Reads the user_id from the Supabase JWT, then queries the local database
+    to ensure the role is always perfectly fresh, avoiding stale token issues.
 
     Returns:
         Tuple of (user_id: str, role: str).
@@ -131,9 +131,16 @@ async def get_current_user_role(
     if not user_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
-    # Supabase stores custom claims in app_metadata
-    app_metadata: dict = payload.get("app_metadata") or {}
-    role: str = app_metadata.get("role", "level1")
+    # Fetch the fresh role directly from the database to avoid stale JWTs
+    from sqlalchemy import select
+    from app.models.user import User
+
+    result = await db.execute(select(User.role).where(User.id == user_id))
+    role = result.scalar_one_or_none()
+
+    if not role:
+        # Fallback if somehow not in local DB yet
+        role = payload.get("app_metadata", {}).get("role", "level1")
 
     return user_id, role
 
