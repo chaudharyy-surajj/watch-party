@@ -18,26 +18,6 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import Boolean, ForeignKey, String, Text
 from sqlalchemy import Enum as SAEnum
-"""
-StorageProvider ORM model.
-
-Each Level 2+ user may register their own Backblaze B2 (or compatible) bucket.
-Credentials are encrypted at rest using AES-256-GCM before being stored here.
-
-The application decrypts credentials on demand via app.core.security.decrypt_secret().
-Credentials are NEVER logged or included in API responses.
-
-Future providers (R2, S3, MinIO) can be added without changing this schema —
-only the StorageProvider ABC implementation changes.
-"""
-
-from __future__ import annotations
-
-import uuid
-from typing import TYPE_CHECKING
-
-from sqlalchemy import Boolean, ForeignKey, String, Text
-from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
