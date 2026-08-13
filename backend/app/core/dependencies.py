@@ -72,10 +72,10 @@ async def get_current_user_id(
     try:
         payload = decode_supabase_token(token)
     except JWTError as exc:
-        logger.debug("token_validation_failed", error=str(exc))
+        logger.warning("token_validation_failed", error=str(exc))
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token",
+            detail=f"Invalid or expired token: {exc}",
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
 
