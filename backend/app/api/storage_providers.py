@@ -17,7 +17,7 @@ import uuid
 
 import structlog
 from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy import select
 
 from app.core.dependencies import DatabaseDep, RequireLevel2Dep
@@ -60,7 +60,7 @@ class StorageProviderResponse(BaseModel):
     cdn_url: str | None
     is_active: bool
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
