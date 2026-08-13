@@ -41,8 +41,6 @@ export default function RegisterForm() {
         email: form.email.trim(),
         password: form.password,
         options: {
-          // Pass username as metadata — the DB trigger will copy this to
-          // the public.users table on account creation.
           data: {
             username: form.username.trim().toLowerCase(),
           },
@@ -54,14 +52,28 @@ export default function RegisterForm() {
         return;
       }
 
-      // Supabase sends the OTP email automatically.
-      // Redirect to our verify-email page to collect the code.
-      router.push(`/verify-email?email=${encodeURIComponent(form.email.trim())}`);
+      // Supabase sent a magic/confirmation link. Show success message instead of redirecting.
+      setForm((prev) => ({ ...prev, success: true }));
     } catch {
       setError("An unexpected error occurred. Please try again.");
     } finally {
       setIsLoading(false);
     }
+  }
+
+  if ((form as any).success) {
+    return (
+      <div className="text-center space-y-4 py-8 animate-fade-in">
+        <div className="w-16 h-16 bg-success/10 text-success rounded-full flex items-center justify-center mx-auto mb-6">
+          <Check className="w-8 h-8" />
+        </div>
+        <h3 className="text-xl font-semibold text-content-primary">Check your email</h3>
+        <p className="text-content-secondary text-sm">
+          We sent a confirmation link to <strong className="text-content-primary">{form.email}</strong>.
+          Click the link to activate your account.
+        </p>
+      </div>
+    );
   }
 
   return (
