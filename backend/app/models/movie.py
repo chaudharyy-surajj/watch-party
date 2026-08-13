@@ -95,7 +95,7 @@ class Movie(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     # ── Visibility override ───────────────────────────────────────────────────
     # NULL = inherit from collection.visibility
     visibility_override: Mapped[Visibility | None] = mapped_column(
-        SAEnum(Visibility, native_enum=False, length=10),
+        SAEnum(Visibility, native_enum=False, length=10, values_callable=lambda x: [e.value for e in x]),
         nullable=True,
     )
 

@@ -52,7 +52,7 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     # ── Role & status ─────────────────────────────────────────────────────────
     role: Mapped[UserRole] = mapped_column(
-        SAEnum(UserRole, native_enum=False, length=20),
+        SAEnum(UserRole, native_enum=False, length=20, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         default=UserRole.LEVEL1,
         server_default=UserRole.LEVEL1.value,

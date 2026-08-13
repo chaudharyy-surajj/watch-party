@@ -48,7 +48,7 @@ class StorageProvider(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     # ── Provider config ───────────────────────────────────────────────────────
     provider_type: Mapped[StorageProviderType] = mapped_column(
-        SAEnum(StorageProviderType, native_enum=False, length=10),
+        SAEnum(StorageProviderType, native_enum=False, length=10, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
     )
     name: Mapped[str] = mapped_column(
