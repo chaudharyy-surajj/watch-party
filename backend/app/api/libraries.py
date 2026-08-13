@@ -57,6 +57,18 @@ async def create_library(
         owner_id=uuid.UUID(user_id),
     )
     db.add(new_library)
+    await db.flush()
+
+    # Create default collection so it shows up in the library-summary view
+    from app.models.enums import Visibility
+    default_collection = Collection(
+        library_id=new_library.id,
+        name="Main Collection",
+        description="Default collection",
+        visibility=Visibility.PRIVATE if new_library.is_private else Visibility.SHARED,
+        sort_order=0,
+    )
+    db.add(default_collection)
     await db.commit()
 
     # Reload with relations

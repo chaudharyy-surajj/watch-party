@@ -26,7 +26,7 @@ python process.py /path/to/movie.mkv
 You don't need to transfer huge `.mkv` files to your production server! Keep the files on your desktop, and point the script to your live server. It will use your desktop's CPU to encode the video, and upload the files straight from your desktop to Backblaze.
 
 ```bash
-python process.py --api-url https://api.mywatchparty.com /path/to/movie.mkv
+python process.py --api-url https://watch-party-u7jq.onrender.com /path/to/movie.mkv
 ```
 
 The script will prompt you for your admin username and password, then guide you through selecting a collection and confirming the movie title.
@@ -46,7 +46,7 @@ python cleanup.py
 
 **Remote Backend Usage:**
 ```bash
-python cleanup.py --api-url https://api.mywatchparty.com
+python cleanup.py --api-url https://watch-party-u7jq.onrender.com
 ```
 
 The script will:
