@@ -90,12 +90,12 @@ async def get_current_user_id(
 
 
 async def get_current_user_role(
+    db: DatabaseDep,
     credentials: Annotated[
         HTTPAuthorizationCredentials | None,
         Depends(_bearer_scheme),
     ] = None,
     access_token: Annotated[str | None, Cookie()] = None,
-    db: DatabaseDep = Depends(get_db),
 ) -> tuple[str, str]:
     """Return ``(user_id, role)`` from the database.
 
