@@ -49,6 +49,7 @@ class Settings(BaseSettings):
     # Session JWTs are now issued and validated via Supabase Auth.
     secret_key: str = "INSECURE_DEFAULT_CHANGE_IN_PRODUCTION"
     algorithm: str = "HS256"
+    access_token_expire_minutes: int = 60 * 24  # 24 hours (used for stream tokens now)
 
     # ── Supabase Auth ─────────────────────────────────────────────────────────
     # Found in: Supabase Dashboard → Settings → API → JWT Secret
