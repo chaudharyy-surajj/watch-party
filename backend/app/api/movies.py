@@ -209,7 +209,10 @@ async def update_movie(
     stmt = (
         select(Movie)
         .where(Movie.id == movie_id)
-        .options(selectinload(Movie.collection).selectinload(Collection.library))
+        .options(
+            selectinload(Movie.storage_provider),
+            selectinload(Movie.collection).selectinload(Collection.library)
+        )
     )
     result = await db.execute(stmt)
     movie = result.scalar_one_or_none()
@@ -235,6 +238,7 @@ async def update_movie(
         select(Movie)
         .where(Movie.id == movie_id)
         .options(
+            selectinload(Movie.storage_provider),
             selectinload(Movie.collection)
             .selectinload(Collection.library)
             .selectinload(Library.owner)
@@ -255,6 +259,7 @@ async def complete_movie_upload(
         select(Movie)
         .where(Movie.id == movie_id)
         .options(
+            selectinload(Movie.storage_provider),
             selectinload(Movie.collection)
             .selectinload(Collection.library)
             .selectinload(Library.owner)
@@ -294,6 +299,7 @@ async def complete_movie_upload(
         select(Movie)
         .where(Movie.id == movie_id)
         .options(
+            selectinload(Movie.storage_provider),
             selectinload(Movie.collection)
             .selectinload(Collection.library)
             .selectinload(Library.owner)
