@@ -91,7 +91,7 @@ def decode_supabase_token(token: str) -> dict[str, Any]:
         alg = _peek_alg(token)
         if alg != "HS256":
             raise JWTError(f"Algorithm {alg} requires async validation")
-        return jwt.decode(token, settings.supabase_jwt_secret, algorithms=["HS256"])
+        return jwt.decode(token, settings.supabase_jwt_secret, algorithms=["HS256"], audience="authenticated")
     except JWTError:
         raise
     except Exception as exc:
@@ -110,7 +110,7 @@ async def decode_supabase_token_async(token: str) -> dict[str, Any]:
         alg = _peek_alg(token)
 
         if alg == "HS256":
-            return jwt.decode(token, settings.supabase_jwt_secret, algorithms=["HS256"])
+            return jwt.decode(token, settings.supabase_jwt_secret, algorithms=["HS256"], audience="authenticated")
 
         # RS256 / asymmetric — use JWKS public keys
         keys = await _fetch_jwks()
@@ -124,7 +124,7 @@ async def decode_supabase_token_async(token: str) -> dict[str, Any]:
         for jwk_key in keys:
             try:
                 # python-jose accepts JWK dicts directly for RSA keys
-                return jwt.decode(token, jwk_key, algorithms=[alg])
+                return jwt.decode(token, jwk_key, algorithms=[alg], audience="authenticated")
             except JWTError as exc:
                 last_exc = exc
             except Exception as exc:
