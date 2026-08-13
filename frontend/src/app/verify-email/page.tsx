@@ -144,6 +144,8 @@ function VerifyEmailContent() {
             {otp.map((digit, i) => (
               <input
                 key={i}
+                id={`otp-digit-${i}`}
+                name={`otp-digit-${i}`}
                 ref={(el) => { inputRefs.current[i] = el; }}
                 type="text"
                 inputMode="numeric"
