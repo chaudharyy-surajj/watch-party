@@ -157,18 +157,27 @@ def fetch_storage_provider(api_url: str, headers: dict) -> dict:
     }
 
 
-def fetch_collection(api_url: str, headers: dict) -> str:
-    """List available collections and let the user pick one."""
+def fetch_collection(api_url: str, headers: dict, provider_id: str) -> str:
+    """List available collections for the chosen provider and let the user pick one."""
     with console.status("[cyan]Fetching collections...", spinner="dots"):
-        resp = httpx.get(f"{api_url}/api/collections", headers=headers, timeout=30.0)
+        lib_resp = httpx.get(f"{api_url}/api/libraries", headers=headers, timeout=30.0)
+        col_resp = httpx.get(f"{api_url}/api/collections", headers=headers, timeout=30.0)
         
-    if resp.status_code != 200:
-        console.print(f"[red bold]Failed to list collections:[/] {resp.text}")
+    if lib_resp.status_code != 200 or col_resp.status_code != 200:
+        console.print(f"[red bold]Failed to fetch data from API.[/]")
         sys.exit(1)
 
-    collections = resp.json()
+    libraries = lib_resp.json()
+    all_collections = col_resp.json()
+
+    # Filter libraries by the chosen storage provider
+    valid_lib_ids = {lib["id"] for lib in libraries if lib.get("storage_provider", {}).get("id") == provider_id}
+
+    # Filter collections by those valid libraries
+    collections = [c for c in all_collections if c.get("library_id") in valid_lib_ids]
+
     if not collections:
-        console.print("[red bold]No collections found.[/] Please create a collection in the web UI first.")
+        console.print("[red bold]No collections found for this storage provider.[/] Please create a library and collection for this bucket in the web UI first.")
         sys.exit(1)
 
     if len(collections) == 1:
@@ -348,7 +357,7 @@ def main() -> None:
     s3_client = build_s3_client(provider)
 
     # ── Step 4: Pick collection and create movie record ───────────────────────
-    collection_id = fetch_collection(api_url, headers)
+    collection_id = fetch_collection(api_url, headers, provider["id"])
 
     default_title = input_path.stem.replace(".", " ").replace("_", " ").replace("-", " ").title()
     title = Prompt.ask(f"Movie title", default=default_title)
