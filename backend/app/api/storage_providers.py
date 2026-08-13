@@ -139,8 +139,8 @@ async def create_storage_provider(
 
     credentials_json = _json.dumps(
         {
-            "key_id": payload.credentials.key_id,
-            "application_key": payload.credentials.application_key,
+            "key_id": payload.credentials.get("key_id", "").strip(),
+            "application_key": payload.credentials.get("application_key", "").strip(),
         }
     )
     encrypted = encrypt_secret(credentials_json)
