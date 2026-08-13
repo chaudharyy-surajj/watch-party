@@ -154,9 +154,13 @@ def fetch_storage_credentials(api_url: str, headers: dict) -> dict | None:
         return None
         
     creds = cred_resp.json()
+    endpoint_url = creds.get("endpoint_url", "")
+    if endpoint_url and not endpoint_url.startswith("http"):
+        endpoint_url = f"https://{endpoint_url}"
+
     return {
         "bucket_name": creds["bucket_name"],
-        "endpoint_url": creds["endpoint_url"],
+        "endpoint_url": endpoint_url,
         "key_id": creds["key_id"],
         "application_key": creds["application_key"],
     }

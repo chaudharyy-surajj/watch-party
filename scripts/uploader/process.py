@@ -142,12 +142,16 @@ def fetch_storage_provider(api_url: str, headers: dict) -> dict:
         sys.exit(1)
 
     creds = cred_resp.json()
+    endpoint_url = creds.get("endpoint_url", "")
+    if endpoint_url and not endpoint_url.startswith("http"):
+        endpoint_url = f"https://{endpoint_url}"
+        
     console.print(f"[green]✓ Connected to storage:[/] [bold]{chosen['name']}[/]")
     return {
         "id": provider_id,
         "name": chosen["name"],
         "bucket_name": creds["bucket_name"],
-        "endpoint_url": creds["endpoint_url"],
+        "endpoint_url": endpoint_url,
         "key_id": creds["key_id"],
         "application_key": creds["application_key"],
     }
