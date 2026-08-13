@@ -181,21 +181,25 @@ def delete_b2_folder(movie_id: str, creds: dict) -> None:
     prefix = f"movies/{movie_id}/"
 
     console.print(f"    [cyan]Scanning B2 for:[/] {prefix}")
-    paginator = s3.get_paginator("list_objects_v2")
-    objects_to_delete = []
-    for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
-        for obj in page.get("Contents", []):
-            objects_to_delete.append({"Key": obj["Key"]})
+    try:
+        paginator = s3.get_paginator("list_objects_v2")
+        objects_to_delete = []
+        for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+            for obj in page.get("Contents", []):
+                objects_to_delete.append({"Key": obj["Key"]})
 
-    if not objects_to_delete:
-        console.print("    [yellow]No B2 files found for this movie.[/]")
-        return
+        if not objects_to_delete:
+            console.print("    [yellow]No B2 files found for this movie.[/]")
+            return
 
-    s3.delete_objects(
-        Bucket=bucket,
-        Delete={"Objects": objects_to_delete, "Quiet": True},
-    )
-    console.print(f"    [green]Deleted {len(objects_to_delete)} file(s) from B2.[/]")
+        s3.delete_objects(
+            Bucket=bucket,
+            Delete={"Objects": objects_to_delete, "Quiet": True},
+        )
+        console.print(f"    [green]Deleted {len(objects_to_delete)} file(s) from B2.[/]")
+    except Exception as exc:
+        console.print(f"    [red]Failed to connect or delete from B2:[/] {exc}")
+        console.print("    [yellow]Skipping B2 deletion for this movie. You may need to clean it up manually.[/]")
 
 
 # Delete
