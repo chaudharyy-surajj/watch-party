@@ -11,6 +11,11 @@ Install the required Python packages:
 pip install -r requirements.txt
 ```
 
+You must also configure your Supabase credentials so the script can authenticate you. Create a `.env` file in this directory (`scripts/uploader/.env`) with your Supabase Project URL and Anon Key:
+```env
+SUPABASE_URL=https://your-project-id.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
+```
 ---
 
 ## 1. The Uploader (`process.py`)
