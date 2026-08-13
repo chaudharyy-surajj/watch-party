@@ -30,11 +30,7 @@ settings = get_settings()
 
 
 def hash_password(password: str) -> str:
-    """Return a bcrypt hash of *password*.
-
-    rounds=10 is OWASP-recommended for web authentication — secure and ~150ms
-    instead of the ~300ms of the default 12 rounds.
-    """
+    """Return a bcrypt hash of *password*."""
     salt = bcrypt.gensalt(rounds=10)
     return bcrypt.hashpw(password.encode("utf-8"), salt).decode("ascii")
 
@@ -49,15 +45,84 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 # ── Supabase Session JWT ──────────────────────────────────────────────────────
 
+# Cache the JWKS so we don't fetch on every request.
+# Key: supabase_url, Value: list of JWK dicts
+_jwks_cache: dict[str, list[dict]] = {}
+
+
+async def _fetch_jwks() -> list[dict]:
+    """Fetch Supabase's JSON Web Key Set (supports RS256 and HS256 projects)."""
+    if settings.supabase_url in _jwks_cache:
+        return _jwks_cache[settings.supabase_url]
+
+    import httpx
+    jwks_url = f"{settings.supabase_url}/auth/v1/.well-known/jwks.json"
+    async with httpx.AsyncClient(timeout=10) as client:
+        resp = await client.get(jwks_url)
+        resp.raise_for_status()
+        keys = resp.json().get("keys", [])
+
+    _jwks_cache[settings.supabase_url] = keys
+    return keys
+
 
 def decode_supabase_token(token: str) -> dict[str, Any]:
-    """Validate and decode a Supabase-issued session JWT.
+    """Validate a Supabase HS256 token using the JWT secret.
 
-    Uses SUPABASE_JWT_SECRET from settings.
+    For RS256 tokens, use decode_supabase_token_async instead.
+    Peeks at the alg header and dispatches accordingly (sync RS256 not supported).
+
     Raises:
         jose.JWTError: If the token is invalid, expired, or has a bad signature.
     """
-    return jwt.decode(token, settings.supabase_jwt_secret, algorithms=[settings.algorithm])
+    import base64
+    import json as _json
+
+    header_segment = token.split(".")[0]
+    padding = 4 - len(header_segment) % 4
+    header_bytes = base64.urlsafe_b64decode(header_segment + "=" * (padding % 4))
+    alg = _json.loads(header_bytes).get("alg", "HS256")
+
+    if alg == "HS256":
+        return jwt.decode(token, settings.supabase_jwt_secret, algorithms=["HS256"])
+
+    # RS256 — caller must use decode_supabase_token_async
+    raise JWTError(f"Algorithm {alg} requires async validation — use decode_supabase_token_async")
+
+
+async def decode_supabase_token_async(token: str) -> dict[str, Any]:
+    """Validate a Supabase JWT — works for both HS256 and RS256 projects.
+
+    - HS256: validated with SUPABASE_JWT_SECRET (symmetric).
+    - RS256: validated with the public key from Supabase's JWKS endpoint.
+
+    Raises:
+        jose.JWTError: If the token is invalid, expired, or has a bad signature.
+    """
+    import base64
+    import json as _json
+
+    header_segment = token.split(".")[0]
+    padding = 4 - len(header_segment) % 4
+    header_bytes = base64.urlsafe_b64decode(header_segment + "=" * (padding % 4))
+    alg = _json.loads(header_bytes).get("alg", "HS256")
+
+    if alg == "HS256":
+        return jwt.decode(token, settings.supabase_jwt_secret, algorithms=["HS256"])
+
+    # RS256 or other asymmetric alg — fetch JWKS and validate
+    keys = await _fetch_jwks()
+    if not keys:
+        raise JWTError("Could not fetch JWKS from Supabase to validate token")
+
+    last_exc: Exception = JWTError("No matching key found in JWKS")
+    for key in keys:
+        try:
+            return jwt.decode(token, key, algorithms=[alg])
+        except JWTError as exc:
+            last_exc = exc
+
+    raise last_exc
 
 
 # ── Action token helpers (kept for ws, hls, stream, invite) ────────────────────

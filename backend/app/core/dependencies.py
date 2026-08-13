@@ -24,7 +24,7 @@ from jose import JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings, get_settings
-from app.core.security import decode_supabase_token
+from app.core.security import decode_supabase_token_async
 from app.db.session import get_db
 
 logger = structlog.get_logger()
@@ -70,7 +70,7 @@ async def get_current_user_id(
         )
 
     try:
-        payload = decode_supabase_token(token)
+        payload = await decode_supabase_token_async(token)
     except JWTError as exc:
         logger.warning("token_validation_failed", error=str(exc))
         raise HTTPException(
@@ -119,7 +119,7 @@ async def get_current_user_role(
         )
 
     try:
-        payload = decode_supabase_token(token)
+        payload = await decode_supabase_token_async(token)
     except JWTError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
