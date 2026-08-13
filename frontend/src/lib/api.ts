@@ -16,14 +16,10 @@ import axios, {
 } from "axios";
 import { supabase } from "@/lib/supabase";
 
-// In the browser, use a relative base URL so requests go through the
-// Next.js dev-server rewrite proxy (/api/* → http://localhost:8000/api/*).
-// This eliminates CORS preflight issues entirely.
-// On the server side (SSR), we need the absolute URL.
-const BASE_URL =
-  typeof window === "undefined"
-    ? (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000")
-    : ""; // relative — proxied by next.config.mjs rewrites
+// Always use the explicit backend URL when NEXT_PUBLIC_API_URL is set.
+// Falls back to a relative URL (proxied by next.config.mjs) only in local dev
+// where the env var is not set.
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 // ── Axios instance ─────────────────────────────────────────────────────────
 

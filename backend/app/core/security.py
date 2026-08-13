@@ -57,12 +57,7 @@ def decode_supabase_token(token: str) -> dict[str, Any]:
     Raises:
         jose.JWTError: If the token is invalid, expired, or has a bad signature.
     """
-    return jwt.decode(
-        token, 
-        settings.supabase_jwt_secret, 
-        algorithms=[settings.algorithm],
-        audience="authenticated",
-    )
+    return jwt.decode(token, settings.supabase_jwt_secret, algorithms=[settings.algorithm])
 
 
 # ── Action token helpers (kept for ws, hls, stream, invite) ────────────────────
